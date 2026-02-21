@@ -1,6 +1,240 @@
 // contentScript.js
 console.log("✅ Content script loaded:", location.href);
 
+//applying dark mode
+const DARK_STYLE_ID = "vitepulse-dark-theme";
+
+function applyDarkTheme(enabled) {
+  document.getElementById(DARK_STYLE_ID)?.remove();
+  if (!enabled) return;
+
+  const style = document.createElement("style");
+  style.id = DARK_STYLE_ID;
+  style.textContent = `
+    /* ---------- CAPTCHA BLOCK ---------- */
+    .captcha-text {
+      background: #1e293b !important;     /* soft dark blue */
+      color: #e2e8f0 !important;          /* light text */
+      border: 1px solid #334155 !important;
+      border-radius: 8px !important;
+      padding: 8px 12px !important;
+      display: inline-block !important;
+    }
+
+    /* Actual captcha characters */
+    #CaptchaDiv {
+      color: #f8fafc !important;
+      font-weight: 600 !important;
+      letter-spacing: 2px !important;
+      font-size: 16px !important;
+      text-shadow: 0 0 6px rgba(59,130,246,0.6);
+    }
+
+    /* ---------- SIGNIN HEADER (Login page) ---------- */
+    .signin-header {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-bottom: 1px solid #1f2937 !important;
+    }
+
+    /* Ensure all text inside header turns light */
+    .signin-header h1,
+    .signin-header h2,
+    .signin-header h3,
+    .signin-header strong,
+    .signin-header p,
+    .signin-header span,
+    .signin-header div {
+      color: #e5e7eb !important;
+    }
+
+    /* Optional: slightly dim logo glare on dark bg */
+    .signin-header img {
+      filter: brightness(0.95) contrast(1.1);
+    }
+
+    /* Sidebar wrapper */
+    #sidebar-wrapper,
+    #sidebar-wrapper.bg-light,
+    #sidebar-wrapper .bg-light {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-right: 1px solid #1f2937 !important;
+    }
+
+    /* Sidebar links */
+    #sidebar-wrapper .list-group-item,
+    #sidebar-wrapper a.list-group-item,
+    #sidebar-wrapper a.list-group-item.bg-light {
+      background: transparent !important;
+      color: #cbd5f5 !important;
+      border-color: #1f2937 !important;
+    }
+
+    #sidebar-wrapper .list-group-item:hover,
+    #sidebar-wrapper a.list-group-item:hover {
+      background: #1e293b !important;
+      color: #ffffff !important;
+    }
+
+    /* ---------- GLOBAL ---------- */
+    html, body {
+      background: #0b1220 !important;
+      color: #e5e7eb !important;
+    }
+
+    /* ---------- NAVBAR / HEADER ---------- */
+    header, .navbar, .topbar {
+      background: #0f172a !important;
+      border-color: #1f2937 !important;
+    }
+
+    /* ---------- LEFT MENU ---------- */
+    .sidebar, .menu, .nav, .nav-pills {
+      background: #0f172a !important;
+    }
+
+    .nav a, .menu a {
+      color: #cbd5f5 !important;
+    }
+
+    .nav a:hover {
+      background: #1e293b !important;
+    }
+
+    /* ---------- CARDS / PANELS ---------- */
+    .card, .panel, .box, .container, .well {
+      background: #0f172a !important;
+      border-color: #1f2937 !important;
+      color: #e5e7eb !important;
+    }
+
+    /* ---------- TABLE ---------- */
+    table {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-color: #1f2937 !important;
+    }
+
+    th {
+      background: #111827 !important;
+      color: #cbd5f5 !important;
+      border-color: #1f2937 !important;
+    }
+
+    td {
+      border-color: #1f2937 !important;
+    }
+
+    tr:hover {
+      background: #1e293b !important;
+    }
+
+    /* ---------- BUTTONS ---------- */
+    button, .btn {
+      background: #2563eb !important;
+      border-color: #2563eb !important;
+      color: #fff !important;
+    }
+
+    button:hover, .btn:hover {
+      background: #1d4ed8 !important;
+    }
+
+    /* ---------- INPUTS ---------- */
+    input, textarea, select {
+      background: #020617 !important;
+      color: #e5e7eb !important;
+      border: 1px solid #334155 !important;
+    }
+
+    /* ---------- LOGIN PANEL ---------- */
+    .login, .login-panel, .panel-primary {
+      background: #0f172a !important;
+      border-color: #1f2937 !important;
+    }
+
+    /* ---------- LINKS ---------- */
+    a {
+      color: #93c5fd !important;
+    }
+
+    /* ---------- SIDEBAR WRAPPER ---------- */
+    #sidebar-wrapper {
+      background: #0f172a !important;
+      border-right: 1px solid #1f2937 !important;
+    }
+
+    /* Sidebar heading area */
+    #sidebar-wrapper .sidebar-heading {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+      border-bottom: 1px solid #1f2937 !important;
+    }
+
+    /* Remove forced Bootstrap bg-light in sidebar */
+    #sidebar-wrapper.bg-light,
+    #sidebar-wrapper .bg-light {
+      background: #0f172a !important;
+      color: #e5e7eb !important;
+    }
+
+    /* ---------- SIDEBAR LINKS (list-group) ---------- */
+    #sidebar-wrapper .list-group {
+      background: #0f172a !important;
+    }
+
+    #sidebar-wrapper .list-group-item {
+      background: transparent !important;   /* important */
+      color: #cbd5f5 !important;
+      border-color: #1f2937 !important;
+    }
+
+    /* Because the anchors themselves have bg-light class */
+    #sidebar-wrapper a.list-group-item.bg-light {
+      background: transparent !important;
+      color: #cbd5f5 !important;
+    }
+
+    /* Hover + active state */
+    #sidebar-wrapper .list-group-item:hover {
+      background: #1e293b !important;
+      color: #ffffff !important;
+    }
+
+    #sidebar-wrapper .list-group-item.active,
+    #sidebar-wrapper .list-group-item:focus {
+      background: #2563eb !important;
+      color: #ffffff !important;
+      border-color: #2563eb !important;
+    }
+
+    /* Logo visibility tweak (optional, if logo looks too bright) */
+    #sidebar-wrapper img {
+      filter: brightness(0.95) contrast(1.1);
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+chrome.storage.sync.get(["darkMode"], (res) => {
+  applyDarkTheme(!!res.darkMode);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && changes.darkMode) {
+    applyDarkTheme(!!changes.darkMode.newValue);
+  }
+});
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === "toggleDarkMode") {
+    applyDarkTheme(!!msg.enabled);
+    sendResponse({ ok: true });
+  }
+});
+
 /** ---------- Helpers ---------- */
 function onReady(fn) {
   if (document.readyState === "loading") {
@@ -9,6 +243,14 @@ function onReady(fn) {
     fn();
   }
 }
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === "toggleDarkMode") {
+    console.log("🌙 Received toggleDarkMode:", msg.enabled);
+    applyDarkTheme(!!msg.enabled);
+    sendResponse({ ok: true });
+  }
+});
 
 function normalizeKeywords(keywords) {
   if (!keywords) return [];
@@ -96,7 +338,7 @@ const currentUrl = location.href;
 // Captcha routes (login pages)
 const isCaptchaRoute =
   currentUrl == "https://events.vit.ac.in/" ||
-  currentUrl == "https://events.vit.ac.in/Users" ;
+  currentUrl == "https://events.vit.ac.in/Users";
 
 // Highlight route (home index)
 const isHighlightRoute = currentUrl.startsWith(
@@ -142,6 +384,8 @@ if (isHighlightRoute) {
       applyHighlights();
     }
   });
+
+
 
   // Watch for table updates
   const observer = new MutationObserver(() => applyHighlights());
