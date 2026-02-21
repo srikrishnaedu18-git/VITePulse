@@ -16,7 +16,7 @@
     {
       "matches": [
         "https://events.vit.ac.in/Home/index",
-        "https://events.vit.ac.in/",
+        "https://events.vit.ac.in/*",
         "https://events.vit.ac.in/Users"
       ],
       "js": ["contentScript.js"],
