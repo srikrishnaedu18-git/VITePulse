@@ -1,6 +1,6 @@
 // routes/preferences.routes.js
 import express from "express";
-import User from "../models/User.js";
+import User from "../../models/User.js";
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ router.post("/update", async (req, res) => {
     const user = await User.findOneAndUpdate(
       { email }, // identify user by email
       { preferences, schools, buzzwords },
-      { new: true, upsert: true } // create if not exists
+      { new: true, upsert: false } // create if not exists
     );
 
     res.json({ success: true, user });

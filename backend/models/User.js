@@ -10,8 +10,6 @@ const UserSchema = new mongoose.Schema({
   optIn: { type: Boolean, default: true }, // must be true to receive emails
   unsubscribedAt: { type: Date, default: null }, // record timestamp of unsubscribe
   createdAt: { type: Date, default: Date.now },
-  pendingEmail: { type: String, default: null },
-  verificationToken: { type: String, default: null },
 }, { timestamps: true });
 
 export default mongoose.model("User", UserSchema);

@@ -101,7 +101,7 @@ export async function scrapeEvents() {
     await page.goto(process.env.EVENTS_URL, { waitUntil: "networkidle2", timeout: 60000 });
 
     // If redirected to login, perform login
-    if (page.url().includes("login")) {
+    if (page.url().includes("Users")) {
       console.log("⚠️ Session expired, logging in...");
       await login(page);
       await page.goto(process.env.EVENTS_URL, { waitUntil: "networkidle2", timeout: 60000 });

@@ -4,10 +4,13 @@ import mongoose from "mongoose";
 import preferencesRoutes from "./routes/preferences.routes.js";
 import dotenv from 'dotenv';
 import userRoutes from "./routes/user.routes.js";
+import unsubscribeRoutes from "./routes/unsubscribe.routes.js";
+
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use("/api", unsubscribeRoutes);
 
 app.use("/api/preferences", preferencesRoutes);
 app.use("/api/user", userRoutes);
