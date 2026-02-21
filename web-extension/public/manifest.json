@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "VIT Events Filter",
+  "description": "Highlight and filter VIT event posts on the website.",
+  "version": "1.0",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "VIT Events Filter"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://events.vit.ac.in/Home/index",
+        "https://events.vit.ac.in/",
+        "https://events.vit.ac.in/Users"
+      ],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
