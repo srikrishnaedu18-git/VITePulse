@@ -225,6 +225,7 @@ chrome.storage.sync.get(["darkMode"], (res) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes.darkMode) {
     applyDarkTheme(!!changes.darkMode.newValue);
+
   }
 });
 
@@ -262,40 +263,60 @@ function normalizeKeywords(keywords) {
 
 /** ---------- Highlighting ---------- */
 function applyHighlights() {
-  chrome.storage.sync.get(["keywords", "highlightColor"], (result) => {
-    const list = normalizeKeywords(result.keywords);
-    if (list.length === 0) return;
+  chrome.storage.sync.get(
+    ["keywords", "highlightColor", "darkMode"],
+    (result) => {
+      const list = normalizeKeywords(result.keywords);
+      if (list.length === 0) return;
 
-    const color = result.highlightColor || "yellow";
-    const colorMap = {
-      red: { bg: "#FCA5A5", border: "#DC2626" },
-      blue: { bg: "#BFDBFE", border: "#2563EB" },
-      green: { bg: "#BBF7D0", border: "#16A34A" },
-      yellow: { bg: "#FEF3C7", border: "#F59E0B" },
-    };
-    const chosen = colorMap[color] || colorMap.yellow;
+      const color = result.highlightColor || "blue";
+      const isDark = !!result.darkMode;
 
-    const rows = document.querySelectorAll("table tr");
+      const lightPalette = {
+        red: { bg: "#FCA5A5", border: "#DC2626", text: "#7F1D1D" },
+        blue: { bg: "#BFDBFE", border: "#2563EB", text: "#1E3A8A" },
+        green: { bg: "#BBF7D0", border: "#16A34A", text: "#064E3B" },
+        yellow: { bg: "#FEF3C7", border: "#F59E0B", text: "#78350F" },
+      };
 
-    // Clear previous styles
-    rows.forEach((row) => {
-      row.style.backgroundColor = "";
-      row.style.borderLeft = "";
-      row.style.transition = "";
-    });
+      const darkPalette = {
+        red: { bg: "#3f1d1d", border: "#ef4444", text: "#fecaca" },
+        blue: { bg: "#172554", border: "#3b82f6", text: "#bfdbfe" },
+        green: { bg: "#052e16", border: "#22c55e", text: "#bbf7d0" },
+        yellow: { bg: "#422006", border: "#facc15", text: "#fde68a" },
+      };
 
-    // Apply new highlights
-    rows.forEach((row) => {
-      const text = row.innerText ? row.innerText.toLowerCase() : "";
-      if (!text) return;
+      const palette = isDark ? darkPalette : lightPalette;
+      const chosen = palette[color] || palette.yellow;
 
-      if (list.some((keyword) => text.includes(keyword))) {
-        row.style.backgroundColor = chosen.bg;
-        row.style.borderLeft = `4px solid ${chosen.border}`;
-        row.style.transition = "background-color 0.3s ease";
-      }
-    });
-  });
+      const rows = document.querySelectorAll("table tr");
+
+      // Clear previous styles
+      rows.forEach((row) => {
+        row.style.backgroundColor = "";
+        row.style.borderLeft = "";
+        row.style.transition = "";
+        row.style.color = "";
+        row.style.boxShadow = "";
+      });
+
+      // Apply new highlights
+      rows.forEach((row) => {
+        const rowText = row.innerText ? row.innerText.toLowerCase() : "";
+        if (!rowText) return;
+
+        if (list.some((keyword) => keyword && rowText.includes(keyword))) {
+          row.style.backgroundColor = chosen.bg;
+          row.style.borderLeft = `4px solid ${chosen.border}`;
+          row.style.color = chosen.text; // ✅ important for dark mode readability
+          row.style.transition = "background-color 0.25s ease";
+
+          // optional premium look (works in both themes)
+          row.style.boxShadow = `inset 3px 0 0 ${chosen.border}`;
+        }
+      });
+    },
+  );
 }
 
 /** ---------- Captcha Auto-fill (text-based captcha only) ---------- */
@@ -380,7 +401,7 @@ if (isHighlightRoute) {
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" && (changes.keywords || changes.highlightColor)) {
+    if (area === "sync" && (changes.keywords || changes.highlightColor || changes.darkMode)) {
       applyHighlights();
     }
   });
