@@ -69,6 +69,7 @@ export async function runWeeklyPipeline() {
           subject: `Your VIT events digest — Week of ${weekStart.toDateString()}`,
           html: digest.html,
           text: digest.text,
+          user,
         });
         emailsSent += 1;
       } catch (emailErr) {

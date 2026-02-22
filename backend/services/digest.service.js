@@ -1,6 +1,7 @@
 // services/digest.service.js
 import Event from "../models/Event.js";
 import Digest from "../models/Digest.js";
+import { schoolCode } from "../lib/tagging.js";
 
 function groupByType(events) {
   return events.reduce((acc, e) => {
@@ -12,41 +13,37 @@ function groupByType(events) {
 }
 
 function normalizeToken(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return String(value || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function eventSearchText(evt) {
-  const tagText = Array.isArray(evt.tags) ? evt.tags.join(" ") : "";
-  return normalizeToken(
-    [
-      evt.title,
-      evt.school,
-      evt.type,
-      evt.url,
-      tagText,
-      new Date(evt.startDate).toDateString(),
-      new Date(evt.endDate).toDateString(),
-    ].join(" "),
-  );
+function normalizeSchoolName(value) {
+  return normalizeToken(String(value || "").replace(/\s*\([^)]+\)\s*/g, " "));
 }
 
 function matchesPreferences(evt, prefs = [], schools = [], buzzwords = []) {
-  const searchText = eventSearchText(evt);
-  const normalizedTags = new Set((evt.tags || []).map((t) => normalizeToken(t)));
-  const requested = [...(prefs || []), ...(schools || []), ...(buzzwords || [])]
-    .map(normalizeToken)
-    .filter(Boolean);
+  const title = normalizeToken(evt.title);
+  const schoolRaw = normalizeToken(evt.school);
+  const schoolName = normalizeSchoolName(evt.school);
+  const schoolTag = normalizeToken(schoolCode(evt.school || ""));
 
-  // If user has no filters at all, include everything in the week.
-  if (requested.length === 0) return true;
+  // Schools are also treated as tags, so combine all user inputs.
+  const allTags = Array.from(
+    new Set(
+      [...(prefs || []), ...(schools || []), ...(buzzwords || [])]
+        .map(normalizeToken)
+        .filter(Boolean),
+    ),
+  );
 
-  return requested.some((token) => {
-    if (normalizedTags.has(token)) return true;
-    return searchText.includes(token);
+  if (allTags.length === 0) return true;
+
+  return allTags.some((tag) => {
+    return (
+      title.includes(tag) ||
+      schoolRaw.includes(tag) ||
+      schoolName.includes(tag) ||
+      schoolTag === tag
+    );
   });
 }
 
@@ -88,6 +85,12 @@ function renderHtml(user, grouped) {
   </div>`;
 }
 
+function buildUnsubscribeUrl(user) {
+  return `${process.env.APP_URL}/api/unsubscribe?email=${encodeURIComponent(
+    user.email,
+  )}`;
+}
+
 export async function buildUserDigest(user, weekStart, weekEnd) {
   // Fetch events within week window
   const events = await Event.find({
@@ -96,7 +99,7 @@ export async function buildUserDigest(user, weekStart, weekEnd) {
   }).lean();
 
   // Filter by preferences
-  const filtered = events.filter((e) =>
+  const matched = events.filter((e) =>
     matchesPreferences(
       e,
       user.preferences || [],
@@ -105,14 +108,31 @@ export async function buildUserDigest(user, weekStart, weekEnd) {
     ),
   );
 
+  // If an event matches multiple tags, keep it only once per user digest.
+  const seen = new Set();
+  const filtered = matched.filter((e) => {
+    const key = e.id || `${e.title}|${e.school}|${e.startDate}|${e.endDate}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  console.log(
+    `[digest] ${user.email} matched ${filtered.length}/${events.length} events (schools=${(user.schools || []).length}, tags=${(user.buzzwords || []).length})`,
+  );
+
   // Group by event type
   const grouped = groupByType(filtered);
 
   // Flatten event IDs
   const eventIds = filtered.map((e) => e.id);
 
-  const text = renderText(user, grouped);
-  const html = renderHtml(user, grouped);
+  const unsubscribeUrl = buildUnsubscribeUrl(user);
+  const text = `${renderText(user, grouped)}\n\nUnsubscribe: ${unsubscribeUrl}`;
+  const html = `${renderHtml(user, grouped)}
+    <p style="font-size:12px;color:#666">
+      If you prefer not to receive these emails,
+      <a href="${unsubscribeUrl}">unsubscribe here</a>.
+    </p>`;
 
   const digest = await Digest.create({
     userId: user._id,

@@ -11,7 +11,13 @@ router.post("/update", async (req, res) => {
   try {
     const user = await User.findOneAndUpdate(
       { email }, // identify user by email
-      { preferences, schools, buzzwords },
+      {
+        preferences,
+        schools,
+        buzzwords,
+        optIn: true,
+        unsubscribedAt: null,
+      },
       { new: true, upsert: false } // create if not exists
     );
 

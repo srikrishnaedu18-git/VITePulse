@@ -16,16 +16,23 @@ export function makeTransport() {
 
 // ==================== DIGEST EMAIL ====================
 export async function sendDigestEmail({ to, subject, html, text, user }) {
+  const unsubscribeUrl = `${process.env.APP_URL}/api/unsubscribe?email=${encodeURIComponent(
+    user?.email || to,
+  )}`;
+
   const footer = `<p style="font-size:12px;color:#666">
     If you prefer not to receive these emails, 
-    <a href="${process.env.APP_URL}/unsubscribe?email=${encodeURIComponent(
-      user?.email || to
-    )}">
+    <a href="${unsubscribeUrl}">
       unsubscribe here
     </a>.
   </p>`;
 
-  const finalHtml = `${html}${footer}`;
+  const htmlHasUnsubscribe = String(html || "").includes("/api/unsubscribe?");
+  const textHasUnsubscribe = String(text || "").includes("/api/unsubscribe?");
+  const finalHtml = htmlHasUnsubscribe ? String(html || "") : `${html || ""}${footer}`;
+  const finalText = textHasUnsubscribe
+    ? String(text || "")
+    : `${text || ""}\n\nUnsubscribe: ${unsubscribeUrl}`;
   const transport = makeTransport();
 
   return transport.sendMail({
@@ -33,7 +40,7 @@ export async function sendDigestEmail({ to, subject, html, text, user }) {
     to,
     subject,
     html: finalHtml,
-    text,
+    text: finalText,
   });
 }
 

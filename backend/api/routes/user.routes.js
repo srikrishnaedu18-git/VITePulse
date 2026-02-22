@@ -11,7 +11,14 @@ router.post("/register", async (req, res) => {
   try {
     const user = await User.findOneAndUpdate(
       { email },
-      { email, preferences, schools, buzzwords, optIn: true },
+      {
+        email,
+        preferences,
+        schools,
+        buzzwords,
+        optIn: true,
+        unsubscribedAt: null,
+      },
       { new: true, upsert: true }
     );
 
