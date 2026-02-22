@@ -4,18 +4,59 @@ console.log("✅ Content script loaded:", location.href);
 //applying dark mode
 const DARK_STYLE_ID = "vitepulse-dark-theme";
 
-function applyDarkTheme(enabled) {
+function applyDarkTheme(enabled, variant = "copilot") {
   document.getElementById(DARK_STYLE_ID)?.remove();
   if (!enabled) return;
+
+  const isGpt = variant === "gpt";
+  const colors = isGpt
+    ? {
+        captchaBg: "#262626",
+        captchaText: "#f5f5f5",
+        captchaBorder: "#3a3a3a",
+        captchaGlow: "rgba(255,255,255,0.15)",
+        headerBg: "#171717",
+        headerBorder: "#2f2f2f",
+        sidebarText: "#e5e5e5",
+        sidebarHover: "#262626",
+        bodyBg: "#212121",
+        panelBg: "#171717",
+        panelBorder: "#2f2f2f",
+        thBg: "#1f1f1f",
+        btnBg: "#2563eb",
+        btnHover: "#1d4ed8",
+        inputBg: "#0f0f0f",
+        inputBorder: "#3a3a3a",
+        link: "#d4d4d4",
+      }
+    : {
+        captchaBg: "#1e293b",
+        captchaText: "#e2e8f0",
+        captchaBorder: "#334155",
+        captchaGlow: "rgba(59,130,246,0.6)",
+        headerBg: "#0f172a",
+        headerBorder: "#1f2937",
+        sidebarText: "#cbd5f5",
+        sidebarHover: "#1e293b",
+        bodyBg: "#0b1220",
+        panelBg: "#0f172a",
+        panelBorder: "#1f2937",
+        thBg: "#111827",
+        btnBg: "#2563eb",
+        btnHover: "#1d4ed8",
+        inputBg: "#020617",
+        inputBorder: "#334155",
+        link: "#93c5fd",
+      };
 
   const style = document.createElement("style");
   style.id = DARK_STYLE_ID;
   style.textContent = `
     /* ---------- CAPTCHA BLOCK ---------- */
     .captcha-text {
-      background: #1e293b !important;     /* soft dark blue */
-      color: #e2e8f0 !important;          /* light text */
-      border: 1px solid #334155 !important;
+      background: ${colors.captchaBg} !important;
+      color: ${colors.captchaText} !important;
+      border: 1px solid ${colors.captchaBorder} !important;
       border-radius: 8px !important;
       padding: 8px 12px !important;
       display: inline-block !important;
@@ -27,14 +68,14 @@ function applyDarkTheme(enabled) {
       font-weight: 600 !important;
       letter-spacing: 2px !important;
       font-size: 16px !important;
-      text-shadow: 0 0 6px rgba(59,130,246,0.6);
+      text-shadow: 0 0 6px ${colors.captchaGlow};
     }
 
     /* ---------- SIGNIN HEADER (Login page) ---------- */
     .signin-header {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
       color: #e5e7eb !important;
-      border-bottom: 1px solid #1f2937 !important;
+      border-bottom: 1px solid ${colors.headerBorder} !important;
     }
 
     /* Ensure all text inside header turns light */
@@ -57,9 +98,9 @@ function applyDarkTheme(enabled) {
     #sidebar-wrapper,
     #sidebar-wrapper.bg-light,
     #sidebar-wrapper .bg-light {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
       color: #e5e7eb !important;
-      border-right: 1px solid #1f2937 !important;
+      border-right: 1px solid ${colors.headerBorder} !important;
     }
 
     /* Sidebar links */
@@ -67,146 +108,147 @@ function applyDarkTheme(enabled) {
     #sidebar-wrapper a.list-group-item,
     #sidebar-wrapper a.list-group-item.bg-light {
       background: transparent !important;
-      color: #cbd5f5 !important;
-      border-color: #1f2937 !important;
+      color: ${colors.sidebarText} !important;
+      border-color: ${colors.headerBorder} !important;
     }
 
     #sidebar-wrapper .list-group-item:hover,
     #sidebar-wrapper a.list-group-item:hover {
       background: #1e293b !important;
+      background: ${colors.sidebarHover} !important;
       color: #ffffff !important;
     }
 
     /* ---------- GLOBAL ---------- */
     html, body {
-      background: #0b1220 !important;
+      background: ${colors.bodyBg} !important;
       color: #e5e7eb !important;
     }
 
     /* ---------- NAVBAR / HEADER ---------- */
     header, .navbar, .topbar {
-      background: #0f172a !important;
-      border-color: #1f2937 !important;
+      background: ${colors.headerBg} !important;
+      border-color: ${colors.headerBorder} !important;
     }
 
     /* ---------- LEFT MENU ---------- */
     .sidebar, .menu, .nav, .nav-pills {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
     }
 
     .nav a, .menu a {
-      color: #cbd5f5 !important;
+      color: ${colors.sidebarText} !important;
     }
 
     .nav a:hover {
-      background: #1e293b !important;
+      background: ${colors.sidebarHover} !important;
     }
 
     /* ---------- CARDS / PANELS ---------- */
     .card, .panel, .box, .container, .well {
-      background: #0f172a !important;
-      border-color: #1f2937 !important;
+      background: ${colors.panelBg} !important;
+      border-color: ${colors.panelBorder} !important;
       color: #e5e7eb !important;
     }
 
     /* ---------- TABLE ---------- */
     table {
-      background: #0f172a !important;
+      background: ${colors.panelBg} !important;
       color: #e5e7eb !important;
-      border-color: #1f2937 !important;
+      border-color: ${colors.panelBorder} !important;
     }
 
     th {
-      background: #111827 !important;
-      color: #cbd5f5 !important;
-      border-color: #1f2937 !important;
+      background: ${colors.thBg} !important;
+      color: ${colors.sidebarText} !important;
+      border-color: ${colors.panelBorder} !important;
     }
 
     td {
-      border-color: #1f2937 !important;
+      border-color: ${colors.panelBorder} !important;
     }
 
     tr:hover {
-      background: #1e293b !important;
+      background: ${colors.sidebarHover} !important;
     }
 
     /* ---------- BUTTONS ---------- */
     button, .btn {
-      background: #2563eb !important;
-      border-color: #2563eb !important;
+      background: ${colors.btnBg} !important;
+      border-color: ${colors.btnBg} !important;
       color: #fff !important;
     }
 
     button:hover, .btn:hover {
-      background: #1d4ed8 !important;
+      background: ${colors.btnHover} !important;
     }
 
     /* ---------- INPUTS ---------- */
     input, textarea, select {
-      background: #020617 !important;
+      background: ${colors.inputBg} !important;
       color: #e5e7eb !important;
-      border: 1px solid #334155 !important;
+      border: 1px solid ${colors.inputBorder} !important;
     }
 
     /* ---------- LOGIN PANEL ---------- */
     .login, .login-panel, .panel-primary {
-      background: #0f172a !important;
-      border-color: #1f2937 !important;
+      background: ${colors.panelBg} !important;
+      border-color: ${colors.panelBorder} !important;
     }
 
     /* ---------- LINKS ---------- */
     a {
-      color: #93c5fd !important;
+      color: ${colors.link} !important;
     }
 
     /* ---------- SIDEBAR WRAPPER ---------- */
     #sidebar-wrapper {
-      background: #0f172a !important;
-      border-right: 1px solid #1f2937 !important;
+      background: ${colors.headerBg} !important;
+      border-right: 1px solid ${colors.headerBorder} !important;
     }
 
     /* Sidebar heading area */
     #sidebar-wrapper .sidebar-heading {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
       color: #e5e7eb !important;
-      border-bottom: 1px solid #1f2937 !important;
+      border-bottom: 1px solid ${colors.headerBorder} !important;
     }
 
     /* Remove forced Bootstrap bg-light in sidebar */
     #sidebar-wrapper.bg-light,
     #sidebar-wrapper .bg-light {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
       color: #e5e7eb !important;
     }
 
     /* ---------- SIDEBAR LINKS (list-group) ---------- */
     #sidebar-wrapper .list-group {
-      background: #0f172a !important;
+      background: ${colors.headerBg} !important;
     }
 
     #sidebar-wrapper .list-group-item {
       background: transparent !important;   /* important */
-      color: #cbd5f5 !important;
-      border-color: #1f2937 !important;
+      color: ${colors.sidebarText} !important;
+      border-color: ${colors.headerBorder} !important;
     }
 
     /* Because the anchors themselves have bg-light class */
     #sidebar-wrapper a.list-group-item.bg-light {
       background: transparent !important;
-      color: #cbd5f5 !important;
+      color: ${colors.sidebarText} !important;
     }
 
     /* Hover + active state */
     #sidebar-wrapper .list-group-item:hover {
-      background: #1e293b !important;
+      background: ${colors.sidebarHover} !important;
       color: #ffffff !important;
     }
 
     #sidebar-wrapper .list-group-item.active,
     #sidebar-wrapper .list-group-item:focus {
-      background: #2563eb !important;
+      background: ${colors.btnBg} !important;
       color: #ffffff !important;
-      border-color: #2563eb !important;
+      border-color: ${colors.btnBg} !important;
     }
 
     /* Logo visibility tweak (optional, if logo looks too bright) */
@@ -218,20 +260,27 @@ function applyDarkTheme(enabled) {
   document.head.appendChild(style);
 }
 
-chrome.storage.sync.get(["darkMode"], (res) => {
-  applyDarkTheme(!!res.darkMode);
+function readThemeStateAndApply() {
+  chrome.storage.sync.get(["darkMode", "gptDarkTheme"], (res) => {
+    const variant = res.gptDarkTheme ? "gpt" : "copilot";
+    applyDarkTheme(!!res.darkMode, variant);
+  });
+}
+
+chrome.storage.sync.get(["darkMode", "gptDarkTheme"], (res) => {
+  const variant = res.gptDarkTheme ? "gpt" : "copilot";
+  applyDarkTheme(!!res.darkMode, variant);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" && changes.darkMode) {
-    applyDarkTheme(!!changes.darkMode.newValue);
-
+  if (area === "sync" && (changes.darkMode || changes.gptDarkTheme)) {
+    readThemeStateAndApply();
   }
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "toggleDarkMode") {
-    applyDarkTheme(!!msg.enabled);
+    readThemeStateAndApply();
     sendResponse({ ok: true });
   }
 });
@@ -248,7 +297,7 @@ function onReady(fn) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "toggleDarkMode") {
     console.log("🌙 Received toggleDarkMode:", msg.enabled);
-    applyDarkTheme(!!msg.enabled);
+    readThemeStateAndApply();
     sendResponse({ ok: true });
   }
 });
@@ -264,13 +313,14 @@ function normalizeKeywords(keywords) {
 /** ---------- Highlighting ---------- */
 function applyHighlights() {
   chrome.storage.sync.get(
-    ["keywords", "highlightColor", "darkMode"],
+    ["keywords", "highlightColor", "darkMode", "gptDarkTheme"],
     (result) => {
       const list = normalizeKeywords(result.keywords);
       if (list.length === 0) return;
 
       const color = result.highlightColor || "blue";
       const isDark = !!result.darkMode;
+      const isGptDark = isDark && !!result.gptDarkTheme;
 
       const lightPalette = {
         red: { bg: "#FCA5A5", border: "#DC2626", text: "#7F1D1D" },
@@ -286,7 +336,18 @@ function applyHighlights() {
         yellow: { bg: "#422006", border: "#facc15", text: "#fde68a" },
       };
 
-      const palette = isDark ? darkPalette : lightPalette;
+      const gptDarkPalette = {
+        red: { bg: "#2a1515", border: "#ef4444", text: "#f5d0d0" },
+        blue: { bg: "#162033", border: "#60a5fa", text: "#dbeafe" },
+        green: { bg: "#0f241f", border: "#10a37f", text: "#d1fae5" },
+        yellow: { bg: "#2a220f", border: "#eab308", text: "#fef3c7" },
+      };
+
+      const palette = isDark
+        ? isGptDark
+          ? gptDarkPalette
+          : darkPalette
+        : lightPalette;
       const chosen = palette[color] || palette.yellow;
 
       const rows = document.querySelectorAll("table tr");

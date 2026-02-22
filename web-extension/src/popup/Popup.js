@@ -12,6 +12,7 @@ export default function Popup() {
   const [view, setView] = useState("main"); // "main" or "settings"
   const [highlightColor, setHighlightColor] = useState("yellow");
   const [darkMode, setDarkMode] = useState(false);
+  const [gptDarkTheme, setGptDarkTheme] = useState(false);
   const [inlineEmailStatus, setInlineEmailStatus] = useState(null); 
   const [prefsStatus, setPrefsStatus] = useState(null);
   const [lastSavedTagsSignature, setLastSavedTagsSignature] = useState(null);
@@ -54,25 +55,26 @@ export default function Popup() {
   // ---------- THEME (Popup UI) ----------
   const theme = useMemo(() => {
     const accent = "#4f46e5";
+    const useGptDark = darkMode && gptDarkTheme;
     return {
       accent,
-      bg: darkMode ? "#0b1220" : "#ffffff",
-      card: darkMode ? "#0f172a" : "#f8fafc",
-      border: darkMode ? "#1f2937" : "#e5e7eb",
-      text: darkMode ? "#e5e7eb" : "#111827",
-      subtext: darkMode ? "#94a3b8" : "#6b7280",
-      inputBg: darkMode ? "#020617" : "#ffffff",
-      inputBorder: darkMode ? "#334155" : "#d1d5db",
-      chipBg: darkMode ? "#111827" : "#e0e7ff",
-      chipText: darkMode ? "#c7d2fe" : "#3730a3",
+      bg: darkMode ? (useGptDark ? "#212121" : "#0b1220") : "#ffffff",
+      card: darkMode ? (useGptDark ? "#171717" : "#0f172a") : "#f8fafc",
+      border: darkMode ? (useGptDark ? "#2f2f2f" : "#1f2937") : "#e5e7eb",
+      text: darkMode ? "#f5f5f5" : "#111827",
+      subtext: darkMode ? (useGptDark ? "#b4b4b4" : "#94a3b8") : "#6b7280",
+      inputBg: darkMode ? (useGptDark ? "#0f0f0f" : "#020617") : "#ffffff",
+      inputBorder: darkMode ? (useGptDark ? "#3a3a3a" : "#334155") : "#d1d5db",
+      chipBg: darkMode ? (useGptDark ? "#262626" : "#111827") : "#e0e7ff",
+      chipText: darkMode ? (useGptDark ? "#f5f5f5" : "#c7d2fe") : "#3730a3",
       danger: "#dc2626",
       success: "#16a34a",
-      welcomeBg: darkMode ? "#111827" : "#eef2ff",
-      welcomeBorder: darkMode ? "#1f2937" : "#c7d2fe",
-      welcomeTitle: darkMode ? "#c7d2fe" : "#3730a3",
-      welcomeText: darkMode ? "#94a3b8" : "#4b5563",
+      welcomeBg: darkMode ? (useGptDark ? "#1c1c1c" : "#111827") : "#eef2ff",
+      welcomeBorder: darkMode ? (useGptDark ? "#303030" : "#1f2937") : "#c7d2fe",
+      welcomeTitle: darkMode ? (useGptDark ? "#f5f5f5" : "#c7d2fe") : "#3730a3",
+      welcomeText: darkMode ? (useGptDark ? "#b4b4b4" : "#94a3b8") : "#4b5563",
     };
-  }, [darkMode]);
+  }, [darkMode, gptDarkTheme]);
 
   // --- Schools (short label shown in UI, full name stored as keyword) ---
   const SCHOOL_OPTIONS = useMemo(
@@ -170,10 +172,15 @@ export default function Popup() {
     });
   };
 
+  const toggleThemeVariant = (enabled) => {
+    setGptDarkTheme(enabled);
+    chrome.storage.sync.set({ gptDarkTheme: enabled });
+  };
+
   // Load saved values from chrome storage
   useEffect(() => {
     chrome.storage.sync.get(
-      ["keywords", "email", "highlightColor", "darkMode"],
+      ["keywords", "email", "highlightColor", "darkMode", "gptDarkTheme"],
       (result) => {
         if (result.keywords) {
           const loadedKeywords = Array.isArray(result.keywords)
@@ -191,6 +198,9 @@ export default function Popup() {
         }
         if (result.highlightColor) setHighlightColor(result.highlightColor);
         if (typeof result.darkMode === "boolean") setDarkMode(result.darkMode);
+        if (typeof result.gptDarkTheme === "boolean") {
+          setGptDarkTheme(result.gptDarkTheme);
+        }
       },
     );
   }, []);
@@ -370,7 +380,7 @@ export default function Popup() {
           ))}
         </div>
 
-        {/* Dark mode card */}
+        {/* Mode + Theme card */}
         <div
           style={{
             background: theme.card,
@@ -382,70 +392,157 @@ export default function Popup() {
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              alignItems: "start",
             }}
           >
-            <div>
-              <p
-                style={{
-                  margin: 0,
-                  fontWeight: 700,
-                  fontSize: 13,
-                  color: theme.text,
-                }}
-              >
-                Dark mode
-              </p>
-              <span style={{ fontSize: 11, color: theme.subtext }}>
-                Applies to website + popup
-              </span>
-            </div>
-
-            {/* Toggle switch */}
-            <label
+            <div
               style={{
-                position: "relative",
-                display: "inline-block",
-                width: 36,
-                height: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                background: theme.bg,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 10,
+                padding: "8px 10px",
               }}
             >
-              <input
-                type="checkbox"
-                checked={darkMode}
-                onChange={(e) => toggleDarkMode(e.target.checked)}
-                style={{ opacity: 0, width: 0, height: 0 }}
-              />
-              <span
+              <div style={{ minWidth: 0 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: theme.text,
+                  }}
+                >
+                  Mode
+                </p>
+                <span style={{ fontSize: 11, color: theme.subtext }}>
+                  {darkMode ? "Dark" : "Light"}
+                </span>
+              </div>
+              <label
                 style={{
-                  position: "absolute",
-                  cursor: "pointer",
-                  inset: 0,
-                  backgroundColor: darkMode
-                    ? theme.accent
-                    : darkMode
-                      ? "#334155"
+                  position: "relative",
+                  display: "inline-block",
+                  width: 36,
+                  height: 20,
+                  flexShrink: 0,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={darkMode}
+                  onChange={(e) => toggleDarkMode(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    cursor: "pointer",
+                    inset: 0,
+                    backgroundColor: darkMode ? theme.accent : "#d1d5db",
+                    borderRadius: 20,
+                    transition: "0.25s",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    height: 16,
+                    width: 16,
+                    left: darkMode ? 18 : 2,
+                    top: 2,
+                    backgroundColor: "white",
+                    borderRadius: "50%",
+                    transition: "0.25s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  }}
+                />
+              </label>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                background: theme.bg,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 10,
+                padding: "8px 10px",
+                opacity: darkMode ? 1 : 0.6,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: theme.text,
+                  }}
+                >
+                  Theme
+                </p>
+                <span style={{ fontSize: 11, color: theme.subtext }}>
+                  {gptDarkTheme ? "GPT" : "Copilot"}
+                </span>
+              </div>
+              <label
+                style={{
+                  position: "relative",
+                  display: "inline-block",
+                  width: 36,
+                  height: 20,
+                  flexShrink: 0,
+                  cursor: darkMode ? "pointer" : "not-allowed",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={gptDarkTheme}
+                  disabled={!darkMode}
+                  onChange={(e) => toggleThemeVariant(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    cursor: darkMode ? "pointer" : "not-allowed",
+                    inset: 0,
+                    backgroundColor: darkMode
+                      ? gptDarkTheme
+                        ? theme.accent
+                        : theme.accent
                       : "#d1d5db",
-                  borderRadius: 20,
-                  transition: "0.25s",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  height: 16,
-                  width: 16,
-                  left: darkMode ? 18 : 2,
-                  top: 2,
-                  backgroundColor: "white",
-                  borderRadius: "50%",
-                  transition: "0.25s",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                }}
-              />
-            </label>
+                    borderRadius: 20,
+                    transition: "0.25s",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    height: 16,
+                    width: 16,
+                    left: gptDarkTheme ? 18 : 2,
+                    top: 2,
+                    backgroundColor: "white",
+                    borderRadius: "50%",
+                    transition: "0.25s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: theme.subtext }}>
+            Mode applies to website + popup. Theme switches the dark palette between Copilot and GPT styles.
           </div>
         </div>
 
