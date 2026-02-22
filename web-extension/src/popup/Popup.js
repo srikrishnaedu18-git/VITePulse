@@ -8,10 +8,18 @@ export default function Popup() {
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState(null);
   const [emailLocked, setEmailLocked] = useState(false);
+  const [savedEmail, setSavedEmail] = useState("");
   const [view, setView] = useState("main"); // "main" or "settings"
   const [highlightColor, setHighlightColor] = useState("yellow");
   const [darkMode, setDarkMode] = useState(false);
   const [inlineEmailStatus, setInlineEmailStatus] = useState(null); 
+  const [prefsStatus, setPrefsStatus] = useState(null);
+  const [lastSavedTagsSignature, setLastSavedTagsSignature] = useState(null);
+
+  const tagsSignature = useMemo(
+    () => [...keywords].sort((a, b) => a.localeCompare(b)).join("||"),
+    [keywords],
+  );
 
 
   const registerEmail = async () => {
@@ -25,13 +33,14 @@ export default function Popup() {
     setInlineEmailStatus("loading");
 
     try {
-      await axios.post("http://127.0.0.1:4000/api/user/register", {
-        email: cleaned,
-        preferences: keywords, // optional, but good to store current prefs
-      });
+      await axios.post(
+        "http://127.0.0.1:4000/api/user/register",
+        buildUserPayload(cleaned),
+      );
 
       chrome.storage.sync.set({ email: cleaned }, () => {
         setEmail(cleaned);
+        setSavedEmail(cleaned);
         setEmailLocked(true);
         setInlineEmailStatus("success");
         setTimeout(() => setInlineEmailStatus(null), 2000);
@@ -115,6 +124,22 @@ export default function Popup() {
     return SCHOOL_OPTIONS.filter((s) => set.has(s.full)).map((s) => s.short);
   }, [keywords, SCHOOL_OPTIONS]);
 
+  const splitKeywords = () => {
+    const schools = keywords.filter((k) => schoolFullNames.has(k));
+    const buzzwords = keywords.filter((k) => !schoolFullNames.has(k));
+    return { schools, buzzwords };
+  };
+
+  const buildUserPayload = (targetEmail) => {
+    const { schools, buzzwords } = splitKeywords();
+    return {
+      email: (targetEmail || "").trim().toLowerCase(),
+      preferences: keywords,
+      schools,
+      buzzwords,
+    };
+  };
+
   const refreshHighlight = (updatedKeywords, updatedColor = highlightColor) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs?.[0]?.id) return;
@@ -151,14 +176,17 @@ export default function Popup() {
       ["keywords", "email", "highlightColor", "darkMode"],
       (result) => {
         if (result.keywords) {
-          setKeywords(
-            Array.isArray(result.keywords)
-              ? result.keywords
-              : result.keywords.split(",").map((k) => k.trim()),
+          const loadedKeywords = Array.isArray(result.keywords)
+            ? result.keywords
+            : result.keywords.split(",").map((k) => k.trim());
+          setKeywords(loadedKeywords);
+          setLastSavedTagsSignature(
+            [...loadedKeywords].sort((a, b) => a.localeCompare(b)).join("||"),
           );
         }
         if (result.email) {
           setEmail(result.email);
+          setSavedEmail(result.email);
           setEmailLocked(true);
         }
         if (result.highlightColor) setHighlightColor(result.highlightColor);
@@ -216,12 +244,11 @@ export default function Popup() {
     const cleanedEmail = (email || "").trim().toLowerCase();
 
     if (!isValidVitStudentEmail(cleanedEmail)) {
-      // You said you prefer no alerts; keeping as-is from your code.
-      alert(
-        "Please enter a valid VIT student email ending with @vitstudent.ac.in",
-      );
+      setPrefsStatus("error");
       return;
     }
+
+    setPrefsStatus("loading");
 
     chrome.storage.sync.set(
       { keywords, email: cleanedEmail, highlightColor },
@@ -232,22 +259,24 @@ export default function Popup() {
 
     try {
       if (!emailLocked) {
-        await axios.post("http://127.0.0.1:4000/api/user/register", {
-          email: cleanedEmail,
-          preferences: keywords,
-        });
-        alert("Registered successfully.");
+        await axios.post(
+          "http://127.0.0.1:4000/api/user/register",
+          buildUserPayload(cleanedEmail),
+        );
         setEmailLocked(true);
+        setSavedEmail(cleanedEmail);
       } else {
-        await axios.post("http://127.0.0.1:4000/api/preferences/update", {
-          email: cleanedEmail,
-          preferences: keywords,
-        });
-        alert("Preferences updated successfully.");
+        await axios.post(
+          "http://127.0.0.1:4000/api/preferences/update",
+          buildUserPayload(cleanedEmail),
+        );
       }
+      setLastSavedTagsSignature(tagsSignature);
+      setPrefsStatus("success");
+      setTimeout(() => setPrefsStatus(null), 2000);
     } catch (err) {
       console.error("Error saving to backend:", err);
-      alert("Error saving to backend");
+      setPrefsStatus("error");
     }
   };
 
@@ -277,6 +306,20 @@ export default function Popup() {
     borderRadius: "6px",
     cursor: "pointer",
   };
+
+  const hasTags = keywords.length > 0;
+  const hasValidEmail = isValidVitStudentEmail((email || "").trim().toLowerCase());
+  const isPrefsDirty =
+    hasTags &&
+    (lastSavedTagsSignature === null || tagsSignature !== lastSavedTagsSignature);
+  const canSavePrefs = hasTags && hasValidEmail && isPrefsDirty && prefsStatus !== "loading";
+
+  const prefsButtonLabel = (() => {
+    if (!hasTags) return "Add tags and schools";
+    if (prefsStatus === "loading") return "Saving...";
+    if (!isPrefsDirty) return "Preferences saved !!";
+    return "Save tags for email";
+  })();
 
   // --- Settings View ---
   if (view === "settings") {
@@ -420,9 +463,14 @@ export default function Popup() {
               ✓ Email saved
             </span>
           )}
+          {emailStatus === "verify_sent" && (
+            <span style={{ color: theme.success, fontSize: 12 }}>
+              Verification mail sent
+            </span>
+          )}
           {emailStatus === "error" && (
             <span style={{ color: theme.danger, fontSize: 12 }}>
-              Enter correct format
+              Could not save email
             </span>
           )}
         </p>
@@ -449,19 +497,37 @@ export default function Popup() {
             }
 
             try {
-              // 🔹 Save locally first (instant UI feedback)
+              setEmailStatus("loading");
+
+              const currentSaved = (savedEmail || "").trim().toLowerCase();
+              const isExistingUser = Boolean(currentSaved);
+
+              if (isExistingUser && currentSaved !== cleaned) {
+                await axios.post(
+                  "http://127.0.0.1:4000/api/user/request-email-change",
+                  {
+                    currentEmail: currentSaved,
+                    newEmail: cleaned,
+                  },
+                );
+                setEmailStatus("verify_sent");
+                setTimeout(() => setEmailStatus(null), 3000);
+                return;
+              }
+
+              // Save locally and sync only for first save / unchanged save
               chrome.storage.sync.set({ email: cleaned }, () => {
                 setEmail(cleaned);
+                setSavedEmail(cleaned);
                 setEmailLocked(true);
                 setEmailStatus("success");
                 setTimeout(() => setEmailStatus(null), 2000);
               });
 
-              // 🔹 Sync with backend (upsert user)
-              await axios.post("http://127.0.0.1:4000/api/user/register", {
-                email: cleaned,
-                preferences: keywords,
-              });
+              await axios.post(
+                "http://127.0.0.1:4000/api/user/register",
+                buildUserPayload(cleaned),
+              );
             } catch (err) {
               console.error("❌ Failed to save email:", err);
               setEmailStatus("error");
@@ -476,6 +542,12 @@ export default function Popup() {
         >
           {emailStatus === "loading" ? "Saving…" : "Save Email"}
         </button>
+
+        {emailStatus === "verify_sent" && (
+          <div style={{ marginTop: 8, fontSize: 12, color: theme.subtext }}>
+            Open the link sent to your new email to finish updating it.
+          </div>
+        )}
       </div>
     );
   }
@@ -594,7 +666,7 @@ export default function Popup() {
         </div>
       )}
 
-      /* Inline status (compact, theme-aware) */
+      {/* Inline status (compact, theme-aware) */}
       {!emailLocked && inlineEmailStatus === "error" && (
         <div style={{ fontSize: 12, color: theme.danger, marginBottom: 8 }}>
           Enter email in correct format
@@ -738,10 +810,45 @@ export default function Popup() {
       </div>
       <button
         onClick={savePreferences}
-        style={{ ...buttonStyle, marginTop: 12, width: "100%", padding: 10 }}
+        disabled={!canSavePrefs}
+        style={{
+          ...buttonStyle,
+          marginTop: 12,
+          width: "100%",
+          padding: 10,
+          opacity: canSavePrefs ? 1 : 0.65,
+          cursor: canSavePrefs ? "pointer" : "not-allowed",
+          background: canSavePrefs ? "#16a34a" : theme.border,
+          color: canSavePrefs ? "#ffffff" : theme.subtext,
+          fontWeight: 700,
+        }}
       >
-        Save Preferences
+        {prefsButtonLabel}
       </button>
+      {prefsStatus === "success" && (
+        <div
+          style={{
+            fontSize: 12,
+            color: theme.success,
+            marginTop: 6,
+            textAlign: "center",
+          }}
+        >
+          Preferences updated successfully
+        </div>
+      )}
+      {prefsStatus === "error" && (
+        <div
+          style={{
+            fontSize: 12,
+            color: theme.danger,
+            marginTop: 6,
+            textAlign: "center",
+          }}
+        >
+          Failed to save preferences. Check email format/backend.
+        </div>
+      )}
     </div>
   );
 }

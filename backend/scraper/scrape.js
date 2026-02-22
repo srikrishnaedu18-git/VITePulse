@@ -7,6 +7,11 @@ dotenv.config();
 
 const COOKIE_PATH = path.join(process.cwd(), ".session.json");
 
+function isLoginUrl(url = "") {
+  const lower = String(url).toLowerCase();
+  return lower.includes("/users") || lower.includes("login");
+}
+
 // ==================== COOKIE MANAGEMENT ====================
 async function loadCookies(page) {
   if (!fs.existsSync(COOKIE_PATH)) return false;
@@ -23,46 +28,50 @@ async function saveCookies(page) {
 // ==================== LOGIN ====================
 async function login(page) {
   console.log("Navigating to login page...");
-  await page.goto(process.env.LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
+  await page.goto(process.env.LOGIN_URL, {
+    waitUntil: "networkidle2",
+    timeout: 60000,
+  });
 
-  // Selectors from .env (with fallbacks)
   const usernameSel = process.env.USERNAME_SELECTOR || "#emailId";
   const passwordSel = process.env.PASSWORD_SELECTOR || "#password";
-  const captchaSel  = process.env.CAPTCHA_SELECTOR || "#captchaInput";
+  const captchaSel = process.env.CAPTCHA_SELECTOR || "#captchaInput";
   const loginBtnSel = process.env.LOGIN_BUTTON_SELECTOR || "#signIn";
-  const captchaTextSel = "#CaptchaDiv"; // hardcoded since it's always there
+  const captchaTextSel = "#CaptchaDiv";
 
-  // Fill username
   await page.waitForSelector(usernameSel);
-  await page.evaluate((sel) => { document.querySelector(sel).value = ""; }, usernameSel);
+  await page.evaluate((sel) => {
+    document.querySelector(sel).value = "";
+  }, usernameSel);
   await page.type(usernameSel, process.env.LOGIN_USER);
 
-  // Fill password
   await page.waitForSelector(passwordSel);
-  await page.evaluate((sel) => { document.querySelector(sel).value = ""; }, passwordSel);
+  await page.evaluate((sel) => {
+    document.querySelector(sel).value = "";
+  }, passwordSel);
   await page.type(passwordSel, process.env.LOGIN_PASS);
 
-  // Extract CAPTCHA text
   await page.waitForSelector(captchaTextSel);
-  const captchaText = await page.$eval(captchaTextSel, el => el.textContent.trim());
+  const captchaText = await page.$eval(captchaTextSel, (el) =>
+    el.textContent.trim(),
+  );
   console.log("🔐 CAPTCHA extracted:", captchaText);
 
-  // Fill CAPTCHA
   await page.waitForSelector(captchaSel);
-  await page.evaluate((sel) => { document.querySelector(sel).value = ""; }, captchaSel);
+  await page.evaluate((sel) => {
+    document.querySelector(sel).value = "";
+  }, captchaSel);
   await page.type(captchaSel, captchaText);
 
-  // Submit login
   console.log("Clicking sign in button...");
   await Promise.all([
     page.click(loginBtnSel),
     page.waitForNavigation({ waitUntil: "networkidle2", timeout: 60000 }),
   ]);
 
-  // Check if login succeeded
   const currentUrl = page.url();
-  if (currentUrl.includes("login") || currentUrl === process.env.LOGIN_URL) {
-    throw new Error("Login failed: Still on login page. Check credentials or CAPTCHA.");
+  if (isLoginUrl(currentUrl)) {
+    throw new Error("Login failed: Still on login page. Check credentials.");
   }
 
   console.log("✅ Login successful!");
@@ -71,18 +80,30 @@ async function login(page) {
 
 // ==================== DATE PARSER ====================
 function parseDateToISO(dateStr) {
-  if (!dateStr) return new Date().toISOString();
+  const raw = (dateStr || "").trim();
+
+  // handle header strings like "Start Date" / "End Date"
+  if (!raw) return null;
+  const looksLikeDate = /^\d{1,2}-\d{1,2}-\d{4}/.test(raw);
+  if (!looksLikeDate) return null;
 
   try {
-    const [datePart, timePart] = dateStr.split(" ");
+    const [datePart, timePart] = raw.split(" ");
     const [day, month, year] = datePart.split("-");
     const [hours, minutes] = (timePart || "00:00").split(":");
 
-    const date = new Date(year, month - 1, day, hours, minutes);
-    return date.toISOString();
-  } catch (e) {
-    console.error("Failed to parse date:", dateStr, e);
-    return new Date().toISOString();
+    const d = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hours),
+      Number(minutes),
+    );
+
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+  } catch {
+    return null;
   }
 }
 
@@ -92,19 +113,28 @@ export async function scrapeEvents() {
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
+
   const page = await browser.newPage();
 
   try {
-    // Try session reuse first
-    const hadCookies = await loadCookies(page);
-    console.log("Going to events page...");
-    await page.goto(process.env.EVENTS_URL, { waitUntil: "networkidle2", timeout: 60000 });
+    await loadCookies(page);
 
-    // If redirected to login, perform login
-    if (page.url().includes("Users")) {
+    console.log("Going to events page...");
+    await page.goto(process.env.EVENTS_URL, {
+      waitUntil: "networkidle2",
+      timeout: 60000,
+    });
+
+    // If redirected to login
+    if (isLoginUrl(page.url())) {
       console.log("⚠️ Session expired, logging in...");
       await login(page);
-      await page.goto(process.env.EVENTS_URL, { waitUntil: "networkidle2", timeout: 60000 });
+
+      // go back to events page
+      await page.goto(process.env.EVENTS_URL, {
+        waitUntil: "networkidle2",
+        timeout: 60000,
+      });
     }
 
     console.log("✓ On events page, waiting for table...");
@@ -114,7 +144,7 @@ export async function scrapeEvents() {
     const rows = await page.$$eval("table tbody tr", (tableRows) =>
       tableRows.map((row) => {
         const cells = row.querySelectorAll("td");
-        if (cells.length < 5) return null;
+        if (cells.length < 6) return null;
 
         return {
           type: cells[0]?.textContent?.trim() || "",
@@ -124,20 +154,28 @@ export async function scrapeEvents() {
           endDate: cells[4]?.textContent?.trim() || "",
           url: cells[5]?.querySelector("a")?.href || "",
         };
-      })
+      }),
     );
 
-    await browser.close();
-
+    // build final events list with parsed dates + skip invalid rows
     const events = rows
       .filter((r) => r && r.title && r.type && r.school)
-      .map((r) => ({
-        ...r,
-        startDate: parseDateToISO(r.startDate),
-        endDate: parseDateToISO(r.endDate),
-      }));
+      .map((r) => {
+        const startISO = parseDateToISO(r.startDate);
+        const endISO = parseDateToISO(r.endDate);
+        if (!startISO || !endISO) return null;
+
+        return {
+          ...r,
+          startDate: startISO,
+          endDate: endISO,
+        };
+      })
+      .filter(Boolean);
 
     console.log(`✅ Successfully scraped ${events.length} events!`);
+
+    await browser.close();
     return events;
   } catch (error) {
     await browser.close();

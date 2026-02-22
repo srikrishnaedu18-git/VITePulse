@@ -11,17 +11,43 @@ function groupByType(events) {
   }, {});
 }
 
-function matchesPreferences(evt, prefs = [], schools = [], buzzwords = []) {
-  const title = evt.title.toLowerCase();
-  const schoolCode = evt.tags.find((t) => t !== evt.type.toUpperCase()); // includes school code
-  const typeMatch = prefs.some(
-    (p) => p.toUpperCase() === evt.type.toUpperCase(),
+function normalizeToken(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function eventSearchText(evt) {
+  const tagText = Array.isArray(evt.tags) ? evt.tags.join(" ") : "";
+  return normalizeToken(
+    [
+      evt.title,
+      evt.school,
+      evt.type,
+      evt.url,
+      tagText,
+      new Date(evt.startDate).toDateString(),
+      new Date(evt.endDate).toDateString(),
+    ].join(" "),
   );
-  const schoolMatch =
-    schools.length === 0 || schools.some((s) => s.toUpperCase() === schoolCode);
-  const buzzMatch = buzzwords.some((b) => title.includes(b.toLowerCase()));
-  // Include if any explicit match OR school filter allows and type matches
-  return buzzMatch || (typeMatch && schoolMatch);
+}
+
+function matchesPreferences(evt, prefs = [], schools = [], buzzwords = []) {
+  const searchText = eventSearchText(evt);
+  const normalizedTags = new Set((evt.tags || []).map((t) => normalizeToken(t)));
+  const requested = [...(prefs || []), ...(schools || []), ...(buzzwords || [])]
+    .map(normalizeToken)
+    .filter(Boolean);
+
+  // If user has no filters at all, include everything in the week.
+  if (requested.length === 0) return true;
+
+  return requested.some((token) => {
+    if (normalizedTags.has(token)) return true;
+    return searchText.includes(token);
+  });
 }
 
 function renderText(user, grouped) {

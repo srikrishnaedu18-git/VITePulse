@@ -27,12 +27,33 @@ export function schoolCode(schoolName) {
 
 // Normalize event tags: type + school code + derived buzzwords
 export function buildTags(evt, buzzwords = []) {
-  const typeTag = evt.type.trim().toUpperCase();        // e.g., WORKSHOP
-  const schoolTag = schoolCode(evt.school);             // e.g., SELECT
-  const titleWords = evt.title.toLowerCase().split(/\W+/).filter(Boolean);
+  const typeTag = (evt.type || "").trim().toUpperCase(); // e.g., WORKSHOP
+  const schoolTag = schoolCode(evt.school || ""); // e.g., SELECT
+  const titleWords = (evt.title || "").toLowerCase().split(/\W+/).filter(Boolean);
+  const schoolWords = (evt.school || "")
+    .toLowerCase()
+    .split(/\W+/)
+    .filter(Boolean);
+  const typeWords = (evt.type || "")
+    .toLowerCase()
+    .split(/\W+/)
+    .filter(Boolean);
   const bwMatches = buzzwords
-    .map(b => b.toLowerCase())
-    .filter(b => titleWords.includes(b));
-  const unique = new Set([typeTag, schoolTag, ...bwMatches]);
+    .map((b) => b.toLowerCase().trim())
+    .filter(Boolean)
+    .filter((b) =>
+      [evt.title || "", evt.school || "", evt.type || ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(b),
+    );
+  const unique = new Set([
+    typeTag,
+    schoolTag,
+    ...bwMatches,
+    ...titleWords,
+    ...schoolWords,
+    ...typeWords,
+  ]);
   return Array.from(unique);
 }

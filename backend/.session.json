@@ -1,0 +1,16 @@
+[
+  {
+    "name": "ci_session",
+    "value": "q9pvs2fk46fo80d7g7cu2h47534rdl28",
+    "domain": "events.vit.ac.in",
+    "path": "/",
+    "expires": 1771740603.696924,
+    "size": 42,
+    "httpOnly": true,
+    "secure": true,
+    "session": false,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  }
+]
