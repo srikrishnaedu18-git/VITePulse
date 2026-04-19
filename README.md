@@ -1,86 +1,142 @@
-# VITePulse (VIT Events Extension + Digest Backend)
+# VITePulse — VIT Events Mail Digest + Chrome Extension
 
-VITePulse is a Chrome extension + Node.js backend that helps users discover VIT events faster.
+## Project Summary
 
-It does two things:
-- Highlights relevant events directly on the VIT events portal based on user-selected tags/schools
-- Scrapes events and sends personalized weekly digest emails to opted-in users
+`VITePulse` is a full-stack JavaScript project combining a Chrome extension and a Node.js backend to help VIT students discover and track campus events.
 
-## Features
+It delivers two core experiences:
+- Browser-based event highlighting on the VIT events portal
+- Personalized weekly email digests built from scraped event data and user preferences
 
-- Chrome extension popup for:
-  - saving VIT student email
-  - selecting schools + custom tags
-  - choosing highlight color
-  - dark mode + theme variant (Copilot-style / GPT-style)
-- In-page event row highlighting on `events.vit.ac.in`
-- Backend scraper (Puppeteer) with login + session cookie reuse
-- MongoDB persistence for users, events, and digests
-- Scheduled digest pipeline (startup run + cron)
-- Manual admin trigger endpoint for pipeline runs
-- Email unsubscribe + re-subscribe flow
-- Email change verification flow (tokenized link)
+This repo demonstrates end-to-end integration of browser extension UI, backend API services, scheduled scraping, email automation, and MongoDB persistence.
 
-## Repo Structure
+## Why this project matters
 
-- `backend/` - Express API, scraper, scheduler, Mongo models, email pipeline
-- `web-extension/` - React-based Chrome extension popup + content script
+- Makes event discovery faster for VIT students by filtering and highlighting relevant event rows in-page
+- Converts raw event portal data into weekly digest emails personalized by school and keyword preferences
+- Supports unsubscribe flow and email change verification, improving real-world user lifecycle handling
+- Demonstrates automation with Puppeteer for authenticated web scraping and session reuse
+
+## Tech Stack
+
+- JavaScript (ES Modules)
+- React (Chrome extension popup UI)
+- Chrome Extension Manifest V3
+- Node.js + Express
+- MongoDB + Mongoose
+- Puppeteer for browser automation and scraping
+- Node Cron for scheduled pipeline execution
+- Nodemailer for transactional email and digest delivery
+- dotenv for configuration management
+
+## Resume-Ready Skills Demonstrated
+
+- Full-stack JavaScript development with React frontend and Express/Mongo backend
+- Chrome extension architecture using `chrome.storage`, content scripts, messaging, and Manifest V3
+- Authenticated web scraping using Puppeteer, including login flows, CAPTCHA extraction, and cookie reuse
+- Scheduled background jobs with `node-cron` and safe pipeline concurrency control
+- Email automation and transactional email design, including unsubscribe links and email verification flows
+- Data normalization, deduplication, and preference-driven matching for personalized digest generation
+- API design with secure admin trigger endpoints and user preference management
+- Production-oriented engineering practices such as error alerting, retry-aware pipelines, and environment-based configuration
+
+## Repository Structure
+
+- `backend/`
+  - `api/server.js` — Express server entrypoint
+  - `api/routes/` — API routes for user registration, preferences, admin triggers, and unsubscribe flow
+  - `jobs/scheduler.js` — cron-driven pipeline orchestration and concurrency protection
+  - `jobs/weekly.pipeline.js` — weekly event scrape / sync / digest / email flow
+  - `scraper/scrape.js` — Puppeteer scraper for VIT event portal with session cookie reuse
+  - `services/` — event sync and digest construction logic
+  - `lib/` — tagging and email utilities
+  - `models/` — Mongoose schemas for `User`, `Event`, and `Digest`
+  - `test/` — manual test helpers for email and cron pipeline sanity checks
+
+- `web-extension/`
+  - `public/manifest.json` — Chrome extension manifest
+  - `src/popup/Popup.js` — React popup UI with email registration, preferences, highlighting, and theme controls
+  - `build/` — compiled extension assets ready for Chrome loading
+
+## Key Features
+
+- Chrome popup UI for:
+  - VIT student email registration
+  - school selection and custom keyword tagging
+  - highlight color picker
+  - light/dark mode with Copilot/GPT theme variant
+- Page highlighting on the VIT event portal based on saved `keywords`
+- Backend scraper that logs in to the VIT portal, extracts event rows, and caches cookies for session persistence
+- MongoDB-backed event storage with upsert and field-based deduplication
+- Weekly digest generation for opted-in users with event grouping by type
+- Unsubscribe link and opt-out persistence for email delivery compliance
+- Email change request workflow with tokenized verification link
+- Admin API endpoint to manually trigger the pipeline when needed
 
 ## Architecture Overview
 
-1. User opens extension popup and saves:
-- email
-- school tags (schools are treated as tags too)
-- custom tags
+1. The Chrome extension collects user preferences and saves them locally using `chrome.storage.sync`.
+2. User email and keywords are sent to the backend API to create/update the user profile.
+3. The backend scheduler runs every 10 minutes and on startup:
+   - clears old `Event` and `Digest` records
+   - scrapes the VIT event portal
+   - syncs scraped events into MongoDB
+   - builds personalized digests for each opted-in user
+   - sends email digests via SMTP
+4. Digests include unsubscribe links that mark the user as `optIn: false`.
+5. Saving preferences again re-enables email delivery and refreshes highlights.
 
-2. Extension stores settings in `chrome.storage.sync` and updates backend user record.
+## Important Implementation Details
 
-3. Backend scheduler runs pipeline:
-- purges old `events` + `digests`
-- scrapes fresh events from VIT events portal
-- syncs events to MongoDB
-- builds per-user digest (deduplicated matches)
-- sends digest emails
+- `backend/scraper/scrape.js`
+  - uses Puppeteer with headless Chrome and `--no-sandbox`
+  - extracts login captcha text from the portal and submits it automatically
+  - caches cookies to `.session.json` for reuse across pipeline runs
+- `backend/services/sync.service.js`
+  - produces stable SHA-256 event IDs to avoid duplicate events
+  - normalizes scraped rows into a consistent Mongo schema
+  - generates searchable tags from school code, event type, title, and buzzwords
+- `backend/services/digest.service.js`
+  - filters events by user preferences, school names, and derived school codes
+  - deduplicates matching events per user digest
+  - renders both plain text and HTML email bodies
+- `backend/lib/email.js`
+  - sends digest and verification emails via Nodemailer
+  - appends unsubscribe links automatically when missing
+- `backend/jobs/scheduler.js`
+  - prevents overlapping pipeline runs using an `isRunning` guard
+  - supports manual admin trigger with optional `ADMIN_TRIGGER_TOKEN`
 
-4. Unsubscribe link in digest email updates `optIn=false`.
+## Setup and Run Instructions
 
-5. Saving email/preferences again automatically re-enables email (`optIn=true`).
-
-## Digest Matching Logic (Current)
-
-User-selected schools and custom tags are treated as tags.
-
-For each event, a tag matches if it appears in either:
-- event title
-- event school name (including school code support like `SCORE`)
-
-If any tag matches, the event is included in the user digest.
-
-If the same event matches multiple tags, it is added only once per user digest (deduplicated).
-
-## Backend Setup
-
-### 1. Install dependencies
+### Backend
 
 ```bash
 cd backend
 npm install
+# create backend/.env using the section below
+node api/server.js
 ```
 
-### 2. Create `.env`
+### Chrome Extension
 
-Create `backend/.env` with values like the following:
+```bash
+cd web-extension
+npm install
+npm run build
+```
+
+Then load `web-extension/build` in Chrome as an unpacked extension.
+
+## Environment Variables
+
+Add these values to `backend/.env`:
 
 ```env
-# Server / DB
 PORT=4000
 MONGO_URI=mongodb://127.0.0.1:27017/vit-events
 APP_URL=http://127.0.0.1:4000
-
-# Admin manual trigger (optional but recommended)
-ADMIN_TRIGGER_TOKEN=your_admin_trigger_token
-
-# VIT portal scraping
+ADMIN_TRIGGER_TOKEN=your_admin_token
 LOGIN_URL=https://events.vit.ac.in/Users
 EVENTS_URL=https://events.vit.ac.in/Home/index
 LOGIN_USER=your_vit_login_id
@@ -89,8 +145,6 @@ USERNAME_SELECTOR=#emailId
 PASSWORD_SELECTOR=#password
 CAPTCHA_SELECTOR=#captchaInput
 LOGIN_BUTTON_SELECTOR=#signIn
-
-# Email (SMTP / SES)
 SMTP_HOST=your_smtp_host
 SMTP_PORT=587
 MAIL_USER=your_smtp_username
@@ -98,214 +152,49 @@ MAIL_PASS=your_smtp_password
 ADMIN_EMAIL=your_verified_sender@example.com
 ```
 
-Notes:
-- `APP_URL` is used in unsubscribe and verification email links.
-- A session cookie cache file (`.session.json`) is created in `backend/` after login succeeds.
-
-### 3. Run backend server
-
-```bash
-cd backend
-node api/server.js
-```
-
-What happens on startup:
-- API starts on `PORT` (default `4000`)
-- scheduler loads
-- pipeline runs once shortly after boot
-- cron then runs every 10 minutes (`Asia/Kolkata` timezone)
-
-## Manual Pipeline Trigger (Admin)
-
-Endpoint:
-- `POST /api/admin/run-pipeline`
-
-Example:
-
-```bash
-curl -X POST http://localhost:4000/api/admin/run-pipeline \
-  -H "x-admin-token: your_admin_trigger_token"
-```
-
-If `ADMIN_TRIGGER_TOKEN` is not set, the endpoint is open (local/dev use).
-
-Response behavior:
-- `200` success
-- `409` pipeline already running
-- `401` invalid token (when configured)
-- `500` pipeline failure
-
-## Backend API Endpoints
+## API Endpoints
 
 ### User
 
-- `POST /api/user/register`
-  - Upserts user and enables `optIn`
-  - Also clears `unsubscribedAt`
-
-- `POST /api/user/request-email-change`
-  - Sends verification link to the new email
-
-- `GET /api/user/confirm-email-change?token=...`
-  - Confirms and updates email after token verification
+- `POST /api/user/register` — register or update a user
+- `POST /api/user/request-email-change` — request email update with verification
+- `GET /api/user/confirm-email-change?token=...` — confirm email change
 
 ### Preferences
 
-- `POST /api/preferences/update`
-  - Updates preferences (`preferences`, `schools`, `buzzwords`)
-  - Re-enables `optIn`
+- `POST /api/preferences/update` — update saved preferences and re-enable opt-in
+
+### Admin
+
+- `POST /api/admin/run-pipeline` — manually trigger the weekly pipeline
 
 ### Unsubscribe
 
-- `GET /api/unsubscribe?email=...`
-  - Sets `optIn=false`
-  - Shows a confirmation page with re-subscribe instructions
+- `GET /api/unsubscribe?email=...` — unsubscribe from digest emails
 
-## Extension Setup (Chrome)
+## Developer Notes
 
-### 1. Install dependencies
+- The backend is built with ES modules and modern Node.js patterns.
+- The extension uses React for popup UI and Chrome messaging to refresh page highlights.
+- The pipeline is intentionally designed to purge stale events before re-scraping, keeping digest content fresh.
+- Session cookies are stored in `backend/.session.json` after login for reuse across pipeline runs.
+- The current repo includes manual test scripts under `backend/test/` but does not include a CI test suite.
 
-```bash
-cd web-extension
-npm install
-```
+## Next Improvements
 
-### 2. Build extension
+- Add unit/integration tests for backend and extension logic
+- Add Docker support for local full-stack development
+- Add retry and failure handling for scraper/email pipeline
+- Improve extension UI for tag management and saved preferences
+- Add support for multiple user sessions and user login isolation
 
-```bash
-npm run build
-```
+---
 
-### 3. Load unpacked extension in Chrome
+### Recommended Resume Bullet Points
 
-1. Open `chrome://extensions`
-2. Enable `Developer mode`
-3. Click `Load unpacked`
-4. Select `web-extension/build`
-
-### 4. Use the extension
-
-- Open the VIT events site
-- Open the extension popup
-- Save email (VIT student email)
-- Add schools/tags
-- Save preferences
-- Choose highlight color
-- Toggle dark mode + theme variant (Copilot/GPT)
-
-## Chrome Storage Keys Used
-
-The extension persists user settings in `chrome.storage.sync`:
-
-- `keywords` - schools + custom tags
-- `email` - user email
-- `highlightColor` - row highlight color
-- `darkMode` - light/dark mode flag
-- `gptDarkTheme` - dark-theme variant (false = Copilot, true = GPT)
-
-## Data Models (MongoDB)
-
-### `User`
-- `email`
-- `preferences`
-- `schools`
-- `buzzwords`
-- `optIn`
-- `unsubscribedAt`
-- `pendingEmail`
-- `emailChangeToken`
-- `emailChangeTokenExpiresAt`
-
-### `Event`
-- `id` (hash-based stable identifier)
-- `type`
-- `school`
-- `title`
-- `startDate`
-- `endDate`
-- `url`
-- `tags`
-
-### `Digest`
-- `userId`
-- `weekStart`, `weekEnd`
-- `eventIds`
-- `text`, `html`
-
-## Scraper Notes
-
-- Uses Puppeteer with headless mode
-- Reuses session cookies via `backend/.session.json`
-- Auto-handles login if redirected to VIT login page
-- Parses events from the portal table (`table tbody tr`)
-
-If scraping times out (`Navigation timeout of 60000 ms exceeded`), common causes are:
-- slow site / hanging network requests
-- login redirect page not finishing load
-- temporary VIT portal issues
-
-## Troubleshooting
-
-### 1. Backend runs but no digest email received
-
-Check:
-- `optIn` is `true` for your user
-- SMTP settings are valid
-- `ADMIN_EMAIL` is a valid sender
-- digest logs in backend console (match count per user)
-
-### 2. Digest generated but no events in it
-
-Check:
-- your saved tags/schools in Mongo `users` collection
-- current-week events actually match your tags/schools
-- backend logs for digest match count (`[digest] user matched X/Y events`)
-
-### 3. Unsubscribe link opens but doesn’t work
-
-Ensure:
-- `APP_URL` is correct and reachable from email client/browser
-- backend server is running
-
-### 4. Theme changes in popup but not website
-
-- Reload extension in `chrome://extensions`
-- Refresh the VIT events page so updated content script runs
-
-## Development Notes
-
-- Backend has no `npm scripts` yet; run files directly with `node`.
-- Extension is CRA-based (`react-scripts`).
-- Some test/utility scripts are under `backend/test/` for local experiments.
-
-## Example Local Workflow
-
-```bash
-# Terminal 1: backend
-cd backend
-npm install
-node api/server.js
-
-# Terminal 2: extension build (when UI changes)
-cd web-extension
-npm install
-npm run build
-```
-
-Then reload the unpacked extension in Chrome.
-
-## Security / Limitations (Current)
-
-- User identity is email-based (no full auth/session system yet)
-- Email change flow uses token verification for the new email address
-- Admin trigger endpoint should be protected using `ADMIN_TRIGGER_TOKEN`
-- Scraper depends on VIT portal DOM structure (selectors may need updates if site changes)
-
-## Future Improvements
-
-- Add authentication (OTP/session/JWT) for stronger account ownership
-- Add dedicated backend scripts (`npm run dev`, `npm run start`)
-- Add retry/backoff in scraper navigation
-- Add event detail-page scraping (e.g., descriptions)
-- Add structured logs + monitoring for pipeline runs
-
+- Built a Chrome extension with React and Manifest V3 to provide live event highlighting and personalized filtering on a campus portal
+- Implemented a Node.js/Express backend with MongoDB for user management, event syncing, and email digest generation
+- Automated authenticated scraping with Puppeteer, including login, CAPTCHA extraction, and cookie reuse
+- Designed a scheduled pipeline with `node-cron`, concurrency protection, and manual admin triggers
+- Engineered email workflows with unsubscribe handling and secure email change verification
+- Developed event normalization, tagging, and deduplication logic for personalized digests
